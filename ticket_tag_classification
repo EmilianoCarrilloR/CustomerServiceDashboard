@@ -1,0 +1,64 @@
+import requests
+import csv
+from datetime import datetime, timedelta
+
+# Define your API key
+api_key = ''
+
+# Define the base URL
+base_url = 'http://welog.ladesk.com/api/reports/tags'
+
+# Define the date format
+date_format = "%Y-%m-%d %H:%M:%S"
+
+# Initialize the CSV data list with headers
+csv_data = [["id", "tagName", "answers", "newAnswerAvgTime", "nextAnswerAvgTime"]]
+
+# Calculate the date range for the last 45 days
+end_date = datetime.now()
+start_date = end_date - timedelta(days=45)
+
+# Format the date strings according to API requirements
+date_from = start_date.strftime("%Y-%m-%d 00:00:00")
+date_to = end_date.strftime("%Y-%m-%d 23:59:59")
+
+# Define the URL with the API key and date parameters
+url = f"{base_url}?date_from={date_from}&date_to={date_to}&apikey={api_key}"
+
+# Send a GET request to the URL
+response = requests.get(url, headers={"accept": "application/json"})
+
+# Check if the request was successful (status code 200)
+if response.status_code == 200:
+    # Parse the JSON data
+    json_data = response.json()
+
+    # Extract relevant data and append to CSV data list
+    tags = json_data.get('response', {}).get('tags', [])
+    for tag in tags:
+        # Convert string values to integers for newAnswerAvgTime and nextAnswerAvgTime
+        new_answer_time = int(tag.get('newAnswerAvgTime', 0)) if tag.get('newAnswerAvgTime') else 0
+        next_answer_time = int(tag.get('nextAnswerAvgTime', 0)) if tag.get('nextAnswerAvgTime') else 0
+    
+        row = [
+            tag.get('id', ''),
+            tag.get('tagName', ''),
+            tag.get('answers', ''),
+            new_answer_time,
+            next_answer_time
+        ]
+        csv_data.append(row)
+
+    # Define CSV file path
+    csv_file_path = r""
+
+    # Write all data to a CSV file
+    with open(csv_file_path, mode='w', newline='') as csv_file:
+        csv_writer = csv.writer(csv_file)
+        csv_writer.writerows(csv_data)
+
+    print(f"Data saved to {csv_file_path}")
+else:
+    print("Failed to retrieve data. Details:")
+    print("Response status code:", response.status_code)
+    print("Response content:", response.text)
