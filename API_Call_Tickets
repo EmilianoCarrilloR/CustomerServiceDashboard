@@ -1,0 +1,96 @@
+import subprocess
+import os
+import csv
+import json
+
+# Define the directory path where CSV files will be stored
+output_directory = r""
+
+# Define the list of curl commands, each with its own URL, headers, and filename
+curl_commands = [
+    {
+        'url': 'https://welog.ladesk.com/api/v3/tickets?_page=1&_perPage=1000&_sortDir=DESC&_sortField=last_activity_public&_filters=%5B%5B%22last_activity_public%22%2C%22DP%22%2C%22L90D%22%5D%2C%5B%22status%22%2C%22E%22%2C%22R%22%5D%2C%5B%22departmentid%22%2C%22E%22%2C%22efr375ne%22%5D%2C%5B%22channel_type%22%2C%22E%22%2C%22E%22%5D%5D',
+        'filename': 'resolved_tickets.csv',
+        'field_order': ['id', 'owner_contactid', 'owner_email', 'owner_name', 'departmentid', 'agentid', 'status', 'tags', 'code', 'channel_type', 'date_created', 'date_changed', 'date_resolved', 'date_due', 'date_deleted', 'last_activity', 'last_activity_public', 'public_access_urlcode', 'subject', 'custom_fields']
+    },
+    {
+        'url': 'https://welog.ladesk.com/api/v3/tickets?_page=1&_perPage=1000&_sortDir=DESC&_sortField=last_activity_public&_filters=%5B%5B%22last_activity_public%22%2C%22DP%22%2C%22L90D%22%5D%2C%5B%22status%22%2C%22E%22%2C%22N%22%5D%2C%5B%22departmentid%22%2C%22E%22%2C%22efr375ne%22%5D%2C%5B%22channel_type%22%2C%22E%22%2C%22E%22%5D%5D',
+        'filename': 'new_tickets.csv',
+        'field_order': ['id', 'owner_contactid', 'owner_email', 'owner_name', 'departmentid', 'agentid', 'status', 'tags', 'code', 'channel_type', 'date_created', 'date_changed', 'date_resolved', 'date_due', 'date_deleted', 'last_activity', 'last_activity_public', 'public_access_urlcode', 'subject', 'custom_fields']
+    },
+    {
+        'url': 'https://welog.ladesk.com/api/v3/tickets?_page=1&_perPage=1000&_sortDir=DESC&_sortField=last_activity_public&_filters=%5B%5B%22last_activity_public%22%2C%22DP%22%2C%22L90D%22%5D%2C%5B%22status%22%2C%22E%22%2C%22C%22%5D%2C%5B%22departmentid%22%2C%22E%22%2C%22efr375ne%22%5D%2C%5B%22channel_type%22%2C%22E%22%2C%22E%22%5D%5D',
+        'filename': 'open_tickets.csv',
+        'field_order': ['id', 'owner_contactid', 'owner_email', 'owner_name', 'departmentid', 'agentid', 'status', 'tags', 'code', 'channel_type', 'date_created', 'date_changed', 'date_resolved', 'date_due', 'date_deleted', 'last_activity', 'last_activity_public', 'public_access_urlcode', 'subject', 'custom_fields']
+    }
+]
+
+# Create the output directory if it doesn't exist
+if not os.path.exists(output_directory):
+    os.makedirs(output_directory)
+
+# Function to run a curl command, parse JSON, and save as CSV
+def run_curl_parse_json_and_save_to_csv(curl_command_info, filename, field_order):
+    try:
+        data = []
+
+        for page in range(1, 36):
+            # Modify the URL to include the page parameter
+            url = f"{curl_command_info['url']}&_page={page}"
+
+            # Build the curl command
+            curl_command = [
+                'curl',
+                '-X', 'GET',
+                '-H', 'accept: application/json',
+                '-H', 'apikey: ',
+                # '-H', 'Timezone-Offset: 28800',
+                url
+            ]
+
+            # Run the curl command and parse the JSON response
+            output = subprocess.check_output(curl_command, universal_newlines=True)
+            page_data = json.loads(output)
+
+            if not page_data:
+                # No more data available, break the loop
+                break
+
+            if isinstance(page_data, list):
+                data.extend(page_data)
+            else:
+                print(f"Unexpected response on page {page}: {page_data}")
+                break
+
+        if not data:
+            print("No data found in the response.")
+            return
+
+        # Combine the output directory and filename to create the full file path
+        file_path = os.path.join(output_directory, filename)
+
+        # Preprocess data: Remove newline characters within double-quoted cells
+        for item in data:
+            if 'subject' in item and isinstance(item['subject'], str):
+                item['subject'] = item['subject'].replace('\n', ' ')
+
+        # Save the JSON data as CSV with specified field order
+        with open(file_path, 'w', newline='', encoding='utf-8') as csvfile:
+            csv_writer = csv.DictWriter(csvfile, fieldnames=field_order)
+            csv_writer.writeheader()
+
+            for item in data:
+                # Process each item and remove extra newline characters in the 'subject' field
+                if 'subject' in item:
+                    item['subject'] = ' '.join(item['subject'].splitlines())
+                csv_writer.writerow(item)
+
+        print(f'Response saved to {file_path}')
+    except subprocess.CalledProcessError as e:
+        print(f"Error: {e}")
+    except json.JSONDecodeError as je:
+        print(f"Error decoding JSON: {je}")
+
+# Execute each curl command and save the responses as CSV files
+for command_info in curl_commands:
+    run_curl_parse_json_and_save_to_csv(command_info, command_info['filename'], command_info['field_order'])
