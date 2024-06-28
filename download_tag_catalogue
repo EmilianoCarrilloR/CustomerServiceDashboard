@@ -1,0 +1,39 @@
+import subprocess
+import os
+import csv
+import json
+
+# Define the directory path where the file will be stored
+output_directory = r""
+
+# Create the output directory if it doesn't exist
+if not os.path.exists(output_directory):
+    os.makedirs(output_directory)
+
+# Define the curl command
+curl_command = [
+    'curl',
+    '-X', 'GET',
+    '-H', 'accept: application/json',
+    '-H', 'is_archived: Y',
+    '-H', 'apikey: ',  # Replace 
+    'https://welog.ladesk.com/api/v3/tags'
+]
+
+# Execute the curl command
+try:
+    output = subprocess.check_output(curl_command, universal_newlines=True)
+    # Parse JSON data
+    data = json.loads(output)
+    # Combine the output directory and filename to create the full file path
+    file_path = os.path.join(output_directory, 'tags_output.csv')
+    # Save the output as a CSV file
+    with open(file_path, 'w', newline='', encoding='utf-8') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=data[0].keys())
+        writer.writeheader()
+        writer.writerows(data)
+    print(f"Output saved to: {file_path}")
+except subprocess.CalledProcessError as e:
+    print(f"Error: {e}")
+except json.JSONDecodeError as je:
+    print(f"Error decoding JSON: {je}")
